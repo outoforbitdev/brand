@@ -1,0 +1,80 @@
+# Builds the brand assets and deploys them to GitHub Pages.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Shortly after 00:00 UTC so seasonal windows (UTC dates) flip promptly.
+    - cron: "17 0 * * *"
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "Optional variant name to force (passed as --variant)"
+        required: false
+        type: string
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: extractions/setup-just@v2
+      - run: just lint
+      - run: just test
+      - name: Build (check mode)
+        env:
+          # Passed via env to avoid script injection from the dispatch input.
+          VARIANT: ${{ inputs.variant }}
+        run: |
+          if [ -n "$VARIANT" ]; then
+            node scripts/build.js --check --variant "$VARIANT"
+          else
+            node scripts/build.js --check
+          fi
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Keepalive: GitHub disables scheduled workflows in public repos after 60
+  # days without repo activity. This job re-enables this workflow on each
+  # scheduled run. LIMITATION: once GitHub has disabled the schedule, this
+  # job no longer runs, so it cannot revive a workflow that already lapsed.
+  # It is best-effort only; a manual enable or any repo activity (e.g. a
+  # push) is the real remedy.
+  keepalive:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Re-enable workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow enable deploy.yml --repo ${{ github.repository }}
