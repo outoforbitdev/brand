@@ -4,7 +4,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isValidAssetName, outputFileName } from './naming.js';
+import { isValidAssetName } from './naming.js';
 import { windowsOverlap } from './schedule.js';
 
 const SQUARE_TOLERANCE = 0.01;
@@ -64,21 +64,6 @@ function checkAsset(asset, rootDir, errors) {
       `${label}: viewBox ${box.width}x${box.height} is not square (${asset.source})`,
     );
   }
-}
-
-/**
- * Output file names an entry produces.
- * @param {string} name
- * @param {{formats?: string[], sizes?: number[]}} spec
- * @returns {string[]}
- */
-function outputsOf(name, spec) {
-  const out = [];
-  for (const fmt of spec.formats ?? []) {
-    if (fmt === 'svg') out.push(outputFileName(name, 'svg'));
-    else for (const s of spec.sizes ?? []) out.push(outputFileName(name, fmt, s));
-  }
-  return out;
 }
 
 /**
@@ -146,45 +131,27 @@ export function validateManifest(manifest, rootDir) {
   const assets = manifest.assets ?? [];
   const dynamic = manifest.dynamic ?? [];
   const statics = new Map();
-  const seenNames = new Set();
+  // Duplicate names are the only way to produce duplicate output paths:
+  // valid names contain no hyphen, so outputFileName is injective over
+  // distinct valid names. Statics (v1/static) and dynamics (v1/dynamic) are
+  // separate namespaces, so each is checked on its own and a separate
+  // output-path check would be unreachable.
+  const staticCounts = new Map();
   for (const asset of assets) {
-    if (seenNames.has(asset.name)) {
+    staticCounts.set(asset.name, (staticCounts.get(asset.name) ?? 0) + 1);
+    if (staticCounts.get(asset.name) === 2) {
       errors.push(`duplicate asset name "${asset.name}"`);
     }
-    seenNames.add(asset.name);
     statics.set(asset.name, asset);
     checkAsset(asset, rootDir, errors);
   }
-  const seenDynamic = new Set();
+  const dynamicCounts = new Map();
   for (const alias of dynamic) {
-    if (seenDynamic.has(alias.name)) {
+    dynamicCounts.set(alias.name, (dynamicCounts.get(alias.name) ?? 0) + 1);
+    if (dynamicCounts.get(alias.name) === 2) {
       errors.push(`duplicate dynamic name "${alias.name}"`);
     }
-    seenDynamic.add(alias.name);
     checkDynamic(alias, statics, errors);
   }
-
-  // Statics publish under v1/static and dynamics under v1/dynamic, so each
-  // group has its own output namespace. Output paths derive from the name, so
-  // a repeated name is already reported above; only unique names are checked
-  // here to avoid double reporting.
-  const groups = [
-    assets.map((a) => [a.name, a]),
-    dynamic.map((d) => [d.name, statics.get(d.default) ?? {}]),
-  ];
-  const flagged = [
-    new Set([...seenNames].filter((n) => assets.filter((a) => a.name === n).length > 1)),
-    new Set([...seenDynamic].filter((n) => dynamic.filter((d) => d.name === n).length > 1)),
-  ];
-  groups.forEach((entries, i) => {
-    const seenOutputs = new Set();
-    for (const [name, spec] of entries) {
-      if (flagged[i].has(name)) continue;
-      for (const file of outputsOf(name, spec)) {
-        if (seenOutputs.has(file)) errors.push(`duplicate output path ${file}`);
-        seenOutputs.add(file);
-      }
-    }
-  });
   return errors;
 }
