@@ -4,6 +4,9 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # GitHub disables scheduled workflows in public repos after 60 days without
+  # repository activity. A push to main counts as activity. The README
+  # documents the reminder.
   schedule:
     # Shortly after 00:00 UTC so seasonal windows (UTC dates) flip promptly.
     - cron: "17 0 * * *"
@@ -61,20 +64,3 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-
-  # Keepalive: GitHub disables scheduled workflows in public repos after 60
-  # days without repo activity. This job re-enables this workflow on each
-  # scheduled run. LIMITATION: once GitHub has disabled the schedule, this
-  # job no longer runs, so it cannot revive a workflow that already lapsed.
-  # It is best-effort only; a manual enable or any repo activity (e.g. a
-  # push) is the real remedy.
-  keepalive:
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Re-enable workflow
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow enable deploy.yml --repo ${{ github.repository }}
