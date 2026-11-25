@@ -12,5 +12,5 @@ import { Resvg } from '@resvg/resvg-js';
  * @returns {Buffer} Encoded PNG bytes.
  */
 export function renderPng(svg, size) {
-  return new Resvg(svg, { fitTo: { mode: 'width', value: size } }).render().asPng();
+  return new Resvg(svg, { fitTo: { mode: 'width', value: size }, font: { loadSystemFonts: false } }).render().asPng();
 }

@@ -40,7 +40,10 @@ function stripRootDimensions(svg) {
  * @returns {{pixels: Uint8Array, width: number, height: number}} Decoded image.
  */
 function rasterize(svg, size) {
-  const image = new Resvg(stripRootDimensions(svg), { fitTo: { mode: 'width', value: size } }).render();
+  const image = new Resvg(stripRootDimensions(svg), {
+    fitTo: { mode: 'width', value: size },
+    font: { loadSystemFonts: false },
+  }).render();
   return { pixels: image.pixels, width: image.width, height: image.height };
 }
 
