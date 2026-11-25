@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash } from "node:crypto";
 
 /**
  * Compute the SHA-256 digest of some data.
@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
  * @returns {string} Lowercase hex digest.
  */
 export function sha256(data) {
-  return createHash('sha256').update(data).digest('hex');
+  return createHash("sha256").update(data).digest("hex");
 }
 
 /**
@@ -58,8 +58,8 @@ export function reconcileChecksums(stored, files, opts) {
     JSON.stringify(sortKeys(versions)) !==
     JSON.stringify(sortKeys(stored.versions));
   const hint = versionsDiffer
-    ? ' (tool versions changed; a resvg or svgo upgrade is the likely cause)'
-    : '';
+    ? " (tool versions changed; a resvg or svgo upgrade is the likely cause)"
+    : "";
   if (!rewrite) {
     for (const path of changed) {
       errors.push(`${path}: checksum changed${hint}`);
@@ -68,12 +68,17 @@ export function reconcileChecksums(stored, files, opts) {
 
   for (const path of Object.keys(stored.files)) {
     if (!files.has(path)) {
-      errors.push(`${path}: removed; published static paths must not be removed`);
+      errors.push(
+        `${path}: removed; published static paths must not be removed`,
+      );
     }
   }
 
   return {
-    next: { versions: check ? { ...stored.versions } : { ...versions }, files: nextFiles },
+    next: {
+      versions: check ? { ...stored.versions } : { ...versions },
+      files: sortKeys(nextFiles),
+    },
     errors,
   };
 }

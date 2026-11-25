@@ -143,3 +143,20 @@ test('is idempotent', () => {
   assert.deepEqual(second.errors, []);
   assert.deepEqual(second.next, first.next);
 });
+
+test('next.files keys are sorted regardless of input order', () => {
+  const s = stored({ 'z.png': sha256('z'), 'm.png': sha256('m') });
+  const files = new Map([
+    ['z.png', buf('z')],
+    ['m.png', buf('m')],
+    ['b.png', buf('b')],
+    ['a.png', buf('a')],
+  ]);
+  const r = reconcileChecksums(s, files, opts());
+  assert.deepEqual(Object.keys(r.next.files), [
+    'a.png',
+    'b.png',
+    'm.png',
+    'z.png',
+  ]);
+});
