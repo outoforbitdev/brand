@@ -131,3 +131,44 @@ test('readViewBox parses and rejects', () => {
   assert.deepEqual(readViewBox(svg('0 0 10 20')), { width: 10, height: 20 });
   assert.equal(readViewBox(svg()), null);
 });
+
+test('formats must be a non-empty array', () => {
+  has(errs({ assets: [asset({ formats: undefined })] }), 'formats');
+  has(errs({ assets: [asset({ formats: [] })] }), 'formats');
+  has(errs({ assets: [asset({ formats: 'png' })] }), 'formats');
+});
+test('formats rejects unknown, wrong-case and traversal values', () => {
+  has(errs({ assets: [asset({ formats: ['svg', 'jpg'] })] }), '"jpg"');
+  has(errs({ assets: [asset({ formats: ['svg', 'PNG'] })] }), '"PNG"');
+  has(errs({ assets: [asset({ formats: ['svg', '../x'] })] }), '"../x"');
+});
+test('formats rejects duplicates', () =>
+  has(errs({ assets: [asset({ formats: ['svg', 'svg'] })] }), 'duplicate format'));
+test('png requires non-empty sizes', () => {
+  has(errs({ assets: [asset({ sizes: undefined })] }), 'sizes');
+  has(errs({ assets: [asset({ sizes: [] })] }), 'sizes');
+  has(errs({ assets: [asset({ sizes: 16 })] }), 'sizes');
+});
+test('svg-only asset may omit sizes', () => {
+  assert.deepEqual(errs({ assets: [asset({ formats: ['svg'], sizes: undefined })] }), []);
+  assert.deepEqual(errs({ assets: [asset({ formats: ['svg'], sizes: [] })] }), []);
+});
+test('source must be a string ending in .svg', () => {
+  has(errs({ assets: [asset({ source: undefined })] }), 'source');
+  has(errs({ assets: [asset({ source: 5 })] }), 'source');
+  has(errs({ assets: [asset({ source: 'src/a.png' })] }), '.svg');
+});
+test('source directory is an error, not a crash', () => {
+  mkdirSync(join(root, 'src/dir.svg'), { recursive: true });
+  has(errs({ assets: [asset({ source: 'src/dir.svg' })] }), 'not a file');
+});
+test('source outside src is rejected', () => {
+  has(errs({ assets: [asset({ source: '../../elsewhere/x.svg' })] }), 'inside');
+  has(errs({ assets: [asset({ source: 'src/../a.svg' })] }), 'inside');
+});
+test('viewBox with zero or negative dimensions is rejected', () => {
+  writeFileSync(join(root, 'src/zero.svg'), svg('0 0 0 0'));
+  writeFileSync(join(root, 'src/neg.svg'), svg('0 0 -10 -10'));
+  has(errs({ assets: [asset({ source: 'src/zero.svg' })] }), 'viewBox');
+  has(errs({ assets: [asset({ source: 'src/neg.svg' })] }), 'viewBox');
+});

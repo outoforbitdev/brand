@@ -2,11 +2,12 @@
  * Manifest validation. Collects every problem rather than stopping at the
  * first so authors can fix them in one pass.
  */
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { resolve, sep } from 'node:path';
 import { isValidAssetName } from './naming.js';
 import { windowsOverlap } from './schedule.js';
 
+const FORMATS = ['svg', 'png'];
 const SQUARE_TOLERANCE = 0.01;
 const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -36,6 +37,43 @@ function isMonthDay(value) {
 }
 
 /**
+ * Validate an asset's `formats` and `sizes` shape.
+ * @param {object} asset
+ * @param {string} label Error message prefix naming the asset.
+ * @param {string[]} errors Collected errors, appended to.
+ */
+function checkFormatsAndSizes(asset, label, errors) {
+  const { formats, sizes } = asset;
+  if (!Array.isArray(formats) || formats.length === 0) {
+    errors.push(`${label}: formats ${JSON.stringify(formats)} must be a non-empty array`);
+  } else {
+    for (const format of formats) {
+      if (!FORMATS.includes(format)) {
+        errors.push(
+          `${label}: format ${JSON.stringify(format)} must be exactly "svg" or "png"`,
+        );
+      }
+    }
+    if (new Set(formats).size !== formats.length) {
+      errors.push(`${label}: duplicate format in ${JSON.stringify(formats)}`);
+    }
+  }
+  const wantsPng = Array.isArray(formats) && formats.includes('png');
+  if (sizes !== undefined && !Array.isArray(sizes)) {
+    errors.push(`${label}: sizes ${JSON.stringify(sizes)} must be an array`);
+    return;
+  }
+  if (wantsPng && (sizes ?? []).length === 0) {
+    errors.push(`${label}: sizes must be a non-empty array when png is listed`);
+  }
+  for (const size of sizes ?? []) {
+    if (!Number.isInteger(size) || size <= 0) {
+      errors.push(`${label}: size ${JSON.stringify(size)} must be a positive integer`);
+    }
+  }
+}
+
+/**
  * Validate one static asset, appending problems to `errors`.
  * @param {object} asset
  * @param {string} rootDir
@@ -46,19 +84,30 @@ function checkAsset(asset, rootDir, errors) {
   if (!isValidAssetName(asset.name)) {
     errors.push(`${label}: invalid name "${asset.name}", use lowercase snake_case`);
   }
-  for (const size of asset.sizes ?? []) {
-    if (!Number.isInteger(size) || size <= 0) {
-      errors.push(`${label}: size ${JSON.stringify(size)} must be a positive integer`);
-    }
+  checkFormatsAndSizes(asset, label, errors);
+  const source = asset.source;
+  if (typeof source !== 'string' || !source.endsWith('.svg')) {
+    errors.push(`${label}: source ${JSON.stringify(source)} must be a string ending in .svg`);
+    return;
   }
-  const path = join(rootDir, asset.source ?? '');
-  if (!asset.source || !existsSync(path)) {
-    errors.push(`${label}: missing source ${asset.source}`);
+  const path = resolve(rootDir, source);
+  if (!path.startsWith(resolve(rootDir, 'src') + sep)) {
+    errors.push(`${label}: source ${source} must resolve inside src/`);
+    return;
+  }
+  if (!existsSync(path)) {
+    errors.push(`${label}: missing source ${source}`);
+    return;
+  }
+  if (!statSync(path).isFile()) {
+    errors.push(`${label}: source ${source} is not a file`);
     return;
   }
   const box = readViewBox(readFileSync(path, 'utf8'));
   if (!box) {
     errors.push(`${label}: source ${asset.source} has no valid viewBox`);
+  } else if (!(box.width > 0 && box.height > 0)) {
+    errors.push(`${label}: viewBox ${box.width}x${box.height} must have positive width and height`);
   } else if (Math.abs(box.width - box.height) > SQUARE_TOLERANCE) {
     errors.push(
       `${label}: viewBox ${box.width}x${box.height} is not square (${asset.source})`,
@@ -72,7 +121,8 @@ function checkAsset(asset, rootDir, errors) {
  * @param {unknown[]} b
  * @returns {boolean}
  */
-function sameSet(a = [], b = []) {
+function sameSet(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
   return a.length === b.length && [...a].sort().join() === [...b].sort().join();
 }
 
@@ -96,7 +146,7 @@ function checkDynamic(alias, statics, errors) {
       errors.push(`${label}: variant "${w.variant}" is not a static asset`);
     } else if (
       base &&
-      !(sameSet(variant.formats, base.formats) && sameSet(variant.sizes, base.sizes))
+      !(sameSet(variant.formats, base.formats) && sameSet(variant.sizes ?? [], base.sizes ?? []))
     ) {
       errors.push(
         `${label}: variant "${w.variant}" must have formats and sizes identical to default "${alias.default}"`,
