@@ -155,18 +155,36 @@ export function validateManifest(manifest, rootDir) {
     statics.set(asset.name, asset);
     checkAsset(asset, rootDir, errors);
   }
-  for (const alias of dynamic) checkDynamic(alias, statics, errors);
-
-  const seenOutputs = new Set();
-  const entries = [
-    ...assets.map((a) => [a.name, a]),
-    ...dynamic.map((d) => [d.name, statics.get(d.default) ?? {}]),
-  ];
-  for (const [name, spec] of entries) {
-    for (const file of outputsOf(name, spec)) {
-      if (seenOutputs.has(file)) errors.push(`duplicate output path ${file}`);
-      seenOutputs.add(file);
+  const seenDynamic = new Set();
+  for (const alias of dynamic) {
+    if (seenDynamic.has(alias.name)) {
+      errors.push(`duplicate dynamic name "${alias.name}"`);
     }
+    seenDynamic.add(alias.name);
+    checkDynamic(alias, statics, errors);
   }
+
+  // Statics publish under v1/static and dynamics under v1/dynamic, so each
+  // group has its own output namespace. Output paths derive from the name, so
+  // a repeated name is already reported above; only unique names are checked
+  // here to avoid double reporting.
+  const groups = [
+    assets.map((a) => [a.name, a]),
+    dynamic.map((d) => [d.name, statics.get(d.default) ?? {}]),
+  ];
+  const flagged = [
+    new Set([...seenNames].filter((n) => assets.filter((a) => a.name === n).length > 1)),
+    new Set([...seenDynamic].filter((n) => dynamic.filter((d) => d.name === n).length > 1)),
+  ];
+  groups.forEach((entries, i) => {
+    const seenOutputs = new Set();
+    for (const [name, spec] of entries) {
+      if (flagged[i].has(name)) continue;
+      for (const file of outputsOf(name, spec)) {
+        if (seenOutputs.has(file)) errors.push(`duplicate output path ${file}`);
+        seenOutputs.add(file);
+      }
+    }
+  });
   return errors;
 }

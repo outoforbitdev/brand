@@ -52,9 +52,27 @@ test('missing source', () =>
   has(errs({ assets: [asset({ source: 'src/nope.svg' })] }), 'src/nope.svg'));
 test('duplicate asset names', () =>
   has(errs({ assets: [asset(), asset()] }), 'duplicate'));
-test('duplicate output paths', () => {
-  const m = { assets: [asset(), asset({ name: 'b', source: 'src/b.svg' })], dynamic: [{ name: 'a', default: 'b', schedule: [] }] };
-  has(errs(m), 'duplicate');
+test('duplicate static name yields exactly one error', () =>
+  assert.equal(errs({ assets: [asset(), asset()] }).length, 1));
+test('duplicate dynamic alias names', () => {
+  const m = {
+    assets: [asset(), asset({ name: 'b', source: 'src/b.svg' })],
+    dynamic: [
+      { name: 'dyn', default: 'a', schedule: [] },
+      { name: 'dyn', default: 'b', schedule: [] },
+    ],
+  };
+  const list = errs(m);
+  has(list, 'dyn');
+  has(list, 'duplicate');
+  assert.equal(list.length, 1);
+});
+test('static and dynamic with the same name do not collide', () => {
+  const m = {
+    assets: [asset(), asset({ name: 'b', source: 'src/b.svg' })],
+    dynamic: [{ name: 'a', default: 'b', schedule: [] }],
+  };
+  assert.deepEqual(errs(m), []);
 });
 test('non-square viewBox', () =>
   has(errs({ assets: [asset({ source: 'src/wide.svg' })] }), 'square'));
