@@ -7,8 +7,8 @@ lint:
     npx eslint .
 
 # Build all brand assets.
-build:
-    node scripts/build.js
+build *args:
+    node scripts/build.js {{args}}
 
 # Verify committed assets are up to date.
 build-check:
