@@ -1,0 +1,11 @@
+{
+  "static": [
+    {
+      "name": "ood_logo",
+      "source": "src/ood_logo/ood_logo.svg",
+      "formats": ["svg", "png"],
+      "sizes": [16, 24, 32, 64, 128, 256, 512]
+    }
+  ],
+  "dynamic": []
+}
