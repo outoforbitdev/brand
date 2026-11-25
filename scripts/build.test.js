@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { build } from './build.js';
+import { build, parseArgs } from './build.js';
 import { renderIndexHtml, renderPathsManifest } from './lib/site.js';
 
 const LOGO = new URL('../src/ood_logo/ood_logo.svg', import.meta.url);
@@ -141,4 +141,14 @@ test('second build leaves checksums unchanged; check rejects new asset', async (
 test('invalid manifest rejects with every error', async () => {
   const root = fixture({ assets: [{ name: 'Bad', source: 'src/none.svg', formats: ['svg'], sizes: [] }], dynamic: [] });
   await assert.rejects(build({ rootDir: root }), (e) => /Bad/.test(e.message) && /missing source/.test(e.message));
+});
+
+test('parseArgs accepts a valid date', () => {
+  assert.equal(parseArgs(['--date', '2026-02-28']).date.toISOString(), '2026-02-28T00:00:00.000Z');
+});
+test('parseArgs rejects impossible dates', () => {
+  assert.throws(() => parseArgs(['--date', '2026-02-30']), /YYYY-MM-DD/);
+});
+test('parseArgs rejects malformed dates', () => {
+  assert.throws(() => parseArgs(['--date', '26-2-3']), /YYYY-MM-DD/);
 });

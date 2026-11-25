@@ -189,6 +189,16 @@ export async function build(opts) {
 }
 
 /**
+ * Whether a YYYY-MM-DD string is a real calendar date (rejects 2026-02-30).
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isRealDate(value) {
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/**
  * Parse CLI arguments.
  * @param {string[]} argv Arguments after the script name.
  * @returns {object} Options for {@link build}, minus rootDir.
@@ -205,7 +215,7 @@ export function parseArgs(argv) {
       if (!value) throw new Error(`${arg} requires a value`);
       if (arg === '--variant') opts.variant = value;
       else {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value))) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !isRealDate(value)) {
           throw new Error(`--date must be YYYY-MM-DD, got "${value}"`);
         }
         opts.date = new Date(`${value}T00:00:00Z`);
