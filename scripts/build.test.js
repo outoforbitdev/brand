@@ -152,3 +152,31 @@ test('parseArgs rejects impossible dates', () => {
 test('parseArgs rejects malformed dates', () => {
   assert.throws(() => parseArgs(['--date', '26-2-3']), /YYYY-MM-DD/);
 });
+
+/** Fixture whose assets are wide shapes, with a seasonal variant of the given viewBox. */
+function wideFixture(variantViewBox) {
+  const root = fixture({
+    assets: [
+      { name: 'wide', source: 'src/wide.svg', formats: ['svg', 'png'], sizes: [24] },
+      { name: 'other', source: 'src/other.svg', formats: ['svg', 'png'], sizes: [24] },
+    ],
+    dynamic: [{ name: 'banner', default: 'wide', schedule: [{ variant: 'other', from: '12-01', to: '12-31' }] }],
+  });
+  const shape = (viewBox) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}"><rect width="5" height="5" fill="#f00"/></svg>`;
+  writeFileSync(join(root, 'src/wide.svg'), shape('0 0 20 10'));
+  writeFileSync(join(root, 'src/other.svg'), shape(variantViewBox));
+  return root;
+}
+
+test('non-square assets are named with their actual dimensions', async () => {
+  const root = wideFixture('0 0 40 20');
+  const { paths } = await build({ rootDir: root, date: summer });
+  assert.ok(paths.includes('v1/static/wide-24x12.png'));
+  assert.ok(paths.includes('v1/dynamic/banner-24x12.png'));
+});
+
+test('alias variants that would publish different file names are rejected on any date', async () => {
+  const root = wideFixture('0 0 10 10');
+  await assert.rejects(build({ rootDir: root, date: summer }), /banner.*other.*24x24.*24x12/s);
+});

@@ -13,6 +13,7 @@ test('isValidAssetName rejects bad names', () => {
 });
 
 test('outputFileName builds raster and vector names', () => {
-  assert.equal(outputFileName('ood_logo', 'png', 24), 'ood_logo-24x24.png');
+  assert.equal(outputFileName('ood_logo', 'png', { width: 24, height: 24 }), 'ood_logo-24x24.png');
+  assert.equal(outputFileName('ood_logo', 'png', { width: 24, height: 12 }), 'ood_logo-24x12.png');
   assert.equal(outputFileName('ood_logo', 'svg'), 'ood_logo.svg');
 });

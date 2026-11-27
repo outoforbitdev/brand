@@ -74,8 +74,8 @@ test('static and dynamic with the same name do not collide', () => {
   };
   assert.deepEqual(errs(m), []);
 });
-test('non-square viewBox', () =>
-  has(errs({ assets: [asset({ source: 'src/wide.svg' })] }), 'square'));
+test('non-square viewBox is allowed', () =>
+  assert.deepEqual(errs({ assets: [asset({ source: 'src/wide.svg' })] }), []));
 test('missing viewBox', () =>
   has(errs({ assets: [asset({ source: 'src/novb.svg' })] }), 'viewBox'));
 test('bad size', () => {

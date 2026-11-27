@@ -8,7 +8,6 @@ import { isValidAssetName } from './naming.js';
 import { windowsOverlap } from './schedule.js';
 
 const FORMATS = ['svg', 'png'];
-const SQUARE_TOLERANCE = 0.01;
 const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /**
@@ -108,10 +107,6 @@ function checkAsset(asset, rootDir, errors) {
     errors.push(`${label}: source ${asset.source} has no valid viewBox`);
   } else if (!(box.width > 0 && box.height > 0)) {
     errors.push(`${label}: viewBox ${box.width}x${box.height} must have positive width and height`);
-  } else if (Math.abs(box.width - box.height) > SQUARE_TOLERANCE) {
-    errors.push(
-      `${label}: viewBox ${box.width}x${box.height} is not square (${asset.source})`,
-    );
   }
 }
 

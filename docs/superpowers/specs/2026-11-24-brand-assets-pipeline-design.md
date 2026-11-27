@@ -39,7 +39,7 @@ Rules:
 
 - Lowercase only. Asset names use underscores, never hyphens. A hyphen appears only before the size.
 - Size is omitted for SVG.
-- Sizes are pixel dimensions. The manifest lists one integer per size, and the output is square (`WxW`).
+- Sizes are pixel dimensions. The manifest lists one integer per size, which is the width. The height follows the aspect ratio, rounded to a whole pixel, and the filename carries both (`WxH`).
 - The extension is always in the filename so Pages sends the correct Content-Type.
 - **static**: bytes never change once published. Variants are separate static assets.
 - **dynamic**: a stable alias whose content may change.
@@ -134,9 +134,9 @@ Unit tests for manifest validation, naming rules, variant selection by date (inc
 - **Checksum workflow:** `just build` writes new entries to `static-checksums.json` locally and the contributor commits the file. CI runs the build in `--check` mode, which never writes and needs only `contents: read`. A changed existing hash fails unless `--allow-static-change` is passed locally, which rewrites that entry. The override is never used in CI.
 - **Reproducibility:** dependencies are exact-pinned and installed with `npm ci`, and Node is pinned via `.nvmrc`. Checksums should match across macOS and Linux. If a cross-platform mismatch shows up in testing, checksums for PNGs are generated in CI only, and the plan must say so.
 - **Scheduled runs:** they run the same check. A failure fails loudly (GitHub notifies the repo owner) and the previous deploy stays live.
-- **Source readiness:** `src/ood_logo.svg` is square (viewBox 88.95 x 88.95), has no `<text>`, filters or fonts, and moves to `src/ood_logo/ood_logo.svg`. `ood_logo_christmas` does not exist yet. The initial manifest contains only `ood_logo`, and the seasonal alias is added when the variant exists. Sources must be square, and the validator rejects non-square viewBoxes.
+- **Source readiness:** `src/ood_logo.svg` is square (viewBox 88.95 x 88.95), has no `<text>`, filters or fonts, and moves to `src/ood_logo/ood_logo.svg`. `ood_logo_christmas` does not exist yet. The initial manifest contains only `ood_logo`, and the seasonal alias is added when the variant exists. Sources can be any shape. An earlier draft required square sources, which the issue never asked for.
 - **Pixel-equality safety check:** compared at 512px with a small per-channel tolerance, to allow harmless path rounding.
-- **Dynamic alias consistency:** the validator requires every variant of an alias, including the default, to have identical formats and sizes. This keeps alias URLs from disappearing when the season changes.
+- **Dynamic alias consistency:** the validator requires every variant of an alias, including the default, to have identical formats and sizes, and the build requires them to produce identical file names (the same aspect ratio). This keeps alias URLs from disappearing when the season changes.
 - **Windows:** overlapping windows in one alias are a validation error. Wrap-around ranges (e.g. `12-15` to `01-05`) are supported. `02-29` is a valid bound.
 - **Deploys:** the scheduled run deploys whatever is on `main`. Branch protection with required PR checks is recommended and noted in the README.
 - **URLs:** the generated index and `manifest.json` use relative paths. No base URL setting is needed.

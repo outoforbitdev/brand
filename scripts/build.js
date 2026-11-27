@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { reconcileChecksums } from './lib/checksums.js';
 import { validateManifest } from './lib/manifest.js';
 import { outputFileName } from './lib/naming.js';
-import { renderPng } from './lib/png.js';
+import { pngDimensions, renderPng } from './lib/png.js';
 import { monthDayUtc, pickVariant } from './lib/schedule.js';
 import { renderIndexHtml, renderPathsManifest } from './lib/site.js';
 import { assertVisuallyEqual, simplifySvg } from './lib/svg.js';
@@ -103,6 +103,32 @@ function chooseVariants(dynamic, staticNames, monthDay, variant) {
 }
 
 /**
+ * Check that every variant of each alias publishes the same file names as its
+ * default, so alias URLs never change with the date. Sizes are widths, so
+ * variants with different aspect ratios would produce different heights.
+ * @param {object[]} dynamic Manifest dynamic aliases.
+ * @param {Map<string, {name: string}[]>} outputs Outputs per static asset.
+ * @returns {string[]} Error messages; empty when every alias is consistent.
+ */
+function checkAliasFileNames(dynamic, outputs) {
+  /** File names with the asset name removed, e.g. `-24x12.png`. */
+  const suffixes = (asset) =>
+    outputs.get(asset).map((o) => o.name.slice(asset.length)).sort().join(', ');
+  const errors = [];
+  for (const alias of dynamic) {
+    const expected = suffixes(alias.default);
+    for (const { variant } of alias.schedule ?? []) {
+      if (suffixes(variant) !== expected) {
+        errors.push(
+          `dynamic "${alias.name}": variant "${variant}" publishes ${suffixes(variant)} but default "${alias.default}" publishes ${expected}; variants need the same aspect ratio`,
+        );
+      }
+    }
+  }
+  return errors;
+}
+
+/**
  * Build all brand assets.
  *
  * @param {object} opts
@@ -137,35 +163,41 @@ export async function build(opts) {
 
   /** @type {Map<string, Buffer>} Static files keyed relative to v1/static. */
   const files = new Map();
+  /** @type {Map<string, {name: string, ext: string, dimensions?: object}[]>} */
+  const outputs = new Map();
   for (const asset of assets) {
     const source = readFileSync(join(rootDir, asset.source), 'utf8');
     const simple = simplifySvg(source);
     assertVisuallyEqual(source, simple);
+    const produced = [];
+    const add = (ext, data, dimensions) => {
+      const name = outputFileName(asset.name, ext, dimensions);
+      files.set(name, data);
+      produced.push({ name, ext, dimensions });
+    };
     for (const ext of asset.formats) {
       if (ext === 'svg') {
-        files.set(outputFileName(asset.name, 'svg'), Buffer.from(simple));
+        add(ext, Buffer.from(simple));
       } else {
-        for (const size of asset.sizes) {
-          files.set(outputFileName(asset.name, ext, size), renderPng(simple, size));
+        for (const width of asset.sizes) {
+          const png = renderPng(simple, width);
+          add(ext, png, pngDimensions(png));
         }
       }
     }
+    outputs.set(asset.name, produced);
   }
+  const aliasErrors = checkAliasFileNames(dynamic, outputs);
+  if (aliasErrors.length) throw new Error(aliasErrors.join('\n'));
   for (const [name, data] of files) writeOut(join(outDir, STATIC_DIR, name), data);
 
   const paths = [...files.keys()].map((n) => `${STATIC_DIR}/${n}`);
   for (const alias of dynamic) {
-    const picked = assets.find((a) => a.name === chosen.get(alias));
-    const copy = (ext, size) => {
-      const from = outputFileName(picked.name, ext, size);
-      const to = outputFileName(alias.name, ext, size);
+    for (const { name, ext, dimensions } of outputs.get(chosen.get(alias))) {
+      const to = outputFileName(alias.name, ext, dimensions);
       mkdirSync(join(outDir, DYNAMIC_DIR), { recursive: true });
-      copyFileSync(join(outDir, STATIC_DIR, from), join(outDir, DYNAMIC_DIR, to));
+      copyFileSync(join(outDir, STATIC_DIR, name), join(outDir, DYNAMIC_DIR, to));
       paths.push(`${DYNAMIC_DIR}/${to}`);
-    };
-    for (const ext of picked.formats) {
-      if (ext === 'svg') copy('svg');
-      else for (const size of picked.sizes) copy(ext, size);
     }
   }
 

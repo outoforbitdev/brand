@@ -18,10 +18,11 @@ export function isValidAssetName(name) {
  * Build an output file name, e.g. `ood_logo-24x24.png` or `ood_logo.svg`.
  * @param {string} name Asset name.
  * @param {'svg'|'png'} ext File extension.
- * @param {number} [size] Pixel size, required for raster output.
+ * @param {{width: number, height: number}} [dimensions] Pixel dimensions,
+ *   required for raster output.
  * @returns {string}
  */
-export function outputFileName(name, ext, size) {
+export function outputFileName(name, ext, dimensions) {
   if (ext === 'svg') return `${name}.svg`;
-  return `${name}-${size}x${size}.${ext}`;
+  return `${name}-${dimensions.width}x${dimensions.height}.${ext}`;
 }

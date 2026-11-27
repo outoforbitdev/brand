@@ -26,7 +26,7 @@ Naming rules:
 - Lowercase only. Asset names are snake_case and use underscores, never hyphens.
 - A hyphen appears only before the size.
 - SVG files have no size suffix.
-- PNG sizes are square pixel dimensions, written `<size>x<size>`, such as `24x24`.
+- Each number in `sizes` is a PNG width in pixels. The height follows the artwork's aspect ratio, rounded to a whole pixel, and the filename carries both, such as `24x24` or `24x12`.
 - The extension is always in the file name so Pages sends the correct Content-Type.
 - URLs are flat, so asset names must be unique across the repo. Source files may still be grouped under `src/<asset_group>/`.
 
@@ -76,7 +76,7 @@ For example: `just build --date 2026-12-25`. Once a dynamic alias exists, `just 
 
 ### Source requirements
 
-- Sources must be square. The build rejects any SVG whose `viewBox` is not square.
+- Sources can be any shape. Each needs a `viewBox` with a positive width and height.
 - Convert text to paths. The PNG renderer has limited font handling.
 - Inkscape files are fine. The build simplifies them with svgo (Inkscape and Sodipodi data, metadata, comments and unused ids are stripped, the `viewBox` is kept, fixed `width` and `height` are dropped), then renders both the original and the simplified SVG and fails if the pixels differ.
 
@@ -119,7 +119,7 @@ For example: `just build --date 2026-12-25`. Once a dynamic alias exists, `just 
 
 Rules:
 
-- Every variant of an alias, including the default, must have identical formats and sizes. This keeps alias URLs from disappearing when the season changes.
+- Every variant of an alias, including the default, must have identical formats and sizes, and the same aspect ratio so the PNG filenames match. This keeps alias URLs from disappearing when the season changes.
 - Windows are inclusive `MM-DD` ranges evaluated against the UTC date. They may wrap around the new year, such as `12-15` to `01-05`.
 - Overlapping windows in one alias are an error.
 - An alias can only reference static assets.
