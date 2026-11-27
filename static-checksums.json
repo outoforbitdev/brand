@@ -1,0 +1,16 @@
+{
+  "versions": {
+    "resvg": "2.6.2",
+    "svgo": "4.1.0"
+  },
+  "files": {
+    "ood_logo-128x128.png": "77db30c63db05ee61f885855b99a2ee6ca8b9e6815e1863f3f872e519567acd3",
+    "ood_logo-16x16.png": "f4a60f020dd67f2d15619554e00ec5b732c2c3cb30a13e261ef1ee1e28d24b23",
+    "ood_logo-24x24.png": "89ea90ef30f91584417a66d73e8ca5be95bd1387b1042eb6fc23be2372240e65",
+    "ood_logo-256x256.png": "76bc736539705be8dffd4b26cc71d3b12c6519eefef0c695523676d5d7773e34",
+    "ood_logo-32x32.png": "7b4fc862e17e94fcb5ff29fb2867025c94b8bf10f3e4d61ac3aaacbc1f3f6ee7",
+    "ood_logo-512x512.png": "f8f8d5cdce788c50e7e6ce65adce140e95ab51e0f783d7eef31f344c2a4f4dce",
+    "ood_logo-64x64.png": "63de20ac99aa1f17a3d87eddb2854b06e58c455c33b34673ed8e326573a82f94",
+    "ood_logo.svg": "83659efd7b2e25eb5f0ae0a35cf37f6cec3a345932ca84d934870d709a979fcd"
+  }
+}

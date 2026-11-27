@@ -1,0 +1,174 @@
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { validateManifest, readViewBox } from './manifest.js';
+
+let root;
+const svg = (vb) =>
+  `<svg xmlns="http://www.w3.org/2000/svg"${vb ? ` viewBox="${vb}"` : ''}></svg>`;
+
+before(() => {
+  root = mkdtempSync(join(tmpdir(), 'manifest-'));
+  mkdirSync(join(root, 'src'));
+  writeFileSync(join(root, 'src/a.svg'), svg('0 0 100 100'));
+  writeFileSync(join(root, 'src/b.svg'), svg('0 0 100 100'));
+  writeFileSync(join(root, 'src/wide.svg'), svg('0 0 100 50'));
+  writeFileSync(join(root, 'src/novb.svg'), svg());
+});
+after(() => rmSync(root, { recursive: true, force: true }));
+
+const asset = (o = {}) => ({
+  name: 'a',
+  source: 'src/a.svg',
+  formats: ['svg', 'png'],
+  sizes: [16, 32],
+  ...o,
+});
+const errs = (m) => validateManifest({ assets: [], dynamic: [], ...m }, root);
+const has = (list, text) =>
+  assert.ok(
+    list.some((e) => e.includes(text)),
+    `expected "${text}" in ${JSON.stringify(list)}`,
+  );
+
+test('valid manifest returns no errors', () => {
+  const m = {
+    assets: [asset(), asset({ name: 'b', source: 'src/b.svg' })],
+    dynamic: [
+      {
+        name: 'dyn',
+        default: 'a',
+        schedule: [{ variant: 'b', from: '12-01', to: '12-31' }],
+      },
+    ],
+  };
+  assert.deepEqual(errs(m), []);
+});
+
+test('bad name', () => has(errs({ assets: [asset({ name: 'Bad-Name' })] }), 'Bad-Name'));
+test('missing source', () =>
+  has(errs({ assets: [asset({ source: 'src/nope.svg' })] }), 'src/nope.svg'));
+test('duplicate asset names', () =>
+  has(errs({ assets: [asset(), asset()] }), 'duplicate'));
+test('duplicate static name yields exactly one error', () =>
+  assert.equal(errs({ assets: [asset(), asset()] }).length, 1));
+test('duplicate dynamic alias names', () => {
+  const m = {
+    assets: [asset(), asset({ name: 'b', source: 'src/b.svg' })],
+    dynamic: [
+      { name: 'dyn', default: 'a', schedule: [] },
+      { name: 'dyn', default: 'b', schedule: [] },
+    ],
+  };
+  const list = errs(m);
+  has(list, 'dyn');
+  has(list, 'duplicate');
+  assert.equal(list.length, 1);
+});
+test('static and dynamic with the same name do not collide', () => {
+  const m = {
+    assets: [asset(), asset({ name: 'b', source: 'src/b.svg' })],
+    dynamic: [{ name: 'a', default: 'b', schedule: [] }],
+  };
+  assert.deepEqual(errs(m), []);
+});
+test('non-square viewBox is allowed', () =>
+  assert.deepEqual(errs({ assets: [asset({ source: 'src/wide.svg' })] }), []));
+test('missing viewBox', () =>
+  has(errs({ assets: [asset({ source: 'src/novb.svg' })] }), 'viewBox'));
+test('bad size', () => {
+  for (const s of [0, -4, 1.5, '16']) {
+    has(errs({ assets: [asset({ sizes: [s] })] }), 'size');
+  }
+});
+test('dynamic default not static', () =>
+  has(errs({ assets: [asset()], dynamic: [{ name: 'd', default: 'zzz', schedule: [] }] }), 'zzz'));
+test('dynamic variant not static', () =>
+  has(
+    errs({
+      assets: [asset()],
+      dynamic: [{ name: 'd', default: 'a', schedule: [{ variant: 'qqq', from: '01-01', to: '01-02' }] }],
+    }),
+    'qqq',
+  ));
+test('variants with different formats or sizes', () => {
+  const m = {
+    assets: [asset(), asset({ name: 'b', source: 'src/b.svg', sizes: [16] })],
+    dynamic: [{ name: 'd', default: 'a', schedule: [{ variant: 'b', from: '01-01', to: '01-02' }] }],
+  };
+  has(errs(m), 'identical');
+});
+test('overlapping windows including wrap-around', () => {
+  const m = {
+    assets: [asset(), asset({ name: 'b', source: 'src/b.svg' })],
+    dynamic: [
+      {
+        name: 'd',
+        default: 'a',
+        schedule: [
+          { variant: 'b', from: '12-20', to: '01-05' },
+          { variant: 'b', from: '01-01', to: '01-10' },
+        ],
+      },
+    ],
+  };
+  has(errs(m), 'overlap');
+});
+test('bad window date format and impossible dates', () => {
+  const mk = (from, to) => ({
+    assets: [asset(), asset({ name: 'b', source: 'src/b.svg' })],
+    dynamic: [{ name: 'd', default: 'a', schedule: [{ variant: 'b', from, to }] }],
+  });
+  has(errs(mk('1-1', '12-31')), '1-1');
+  has(errs(mk('02-30', '03-01')), '02-30');
+  has(errs(mk('13-01', '03-01')), '13-01');
+  assert.deepEqual(errs(mk('02-29', '03-01')), []);
+});
+
+test('readViewBox parses and rejects', () => {
+  assert.deepEqual(readViewBox(svg('0 0 10 20')), { width: 10, height: 20 });
+  assert.equal(readViewBox(svg()), null);
+});
+
+test('formats must be a non-empty array', () => {
+  has(errs({ assets: [asset({ formats: undefined })] }), 'formats');
+  has(errs({ assets: [asset({ formats: [] })] }), 'formats');
+  has(errs({ assets: [asset({ formats: 'png' })] }), 'formats');
+});
+test('formats rejects unknown, wrong-case and traversal values', () => {
+  has(errs({ assets: [asset({ formats: ['svg', 'jpg'] })] }), '"jpg"');
+  has(errs({ assets: [asset({ formats: ['svg', 'PNG'] })] }), '"PNG"');
+  has(errs({ assets: [asset({ formats: ['svg', '../x'] })] }), '"../x"');
+});
+test('formats rejects duplicates', () =>
+  has(errs({ assets: [asset({ formats: ['svg', 'svg'] })] }), 'duplicate format'));
+test('png requires non-empty sizes', () => {
+  has(errs({ assets: [asset({ sizes: undefined })] }), 'sizes');
+  has(errs({ assets: [asset({ sizes: [] })] }), 'sizes');
+  has(errs({ assets: [asset({ sizes: 16 })] }), 'sizes');
+});
+test('svg-only asset may omit sizes', () => {
+  assert.deepEqual(errs({ assets: [asset({ formats: ['svg'], sizes: undefined })] }), []);
+  assert.deepEqual(errs({ assets: [asset({ formats: ['svg'], sizes: [] })] }), []);
+});
+test('source must be a string ending in .svg', () => {
+  has(errs({ assets: [asset({ source: undefined })] }), 'source');
+  has(errs({ assets: [asset({ source: 5 })] }), 'source');
+  has(errs({ assets: [asset({ source: 'src/a.png' })] }), '.svg');
+});
+test('source directory is an error, not a crash', () => {
+  mkdirSync(join(root, 'src/dir.svg'), { recursive: true });
+  has(errs({ assets: [asset({ source: 'src/dir.svg' })] }), 'not a file');
+});
+test('source outside src is rejected', () => {
+  has(errs({ assets: [asset({ source: '../../elsewhere/x.svg' })] }), 'inside');
+  has(errs({ assets: [asset({ source: 'src/../a.svg' })] }), 'inside');
+});
+test('viewBox with zero or negative dimensions is rejected', () => {
+  writeFileSync(join(root, 'src/zero.svg'), svg('0 0 0 0'));
+  writeFileSync(join(root, 'src/neg.svg'), svg('0 0 -10 -10'));
+  has(errs({ assets: [asset({ source: 'src/zero.svg' })] }), 'viewBox');
+  has(errs({ assets: [asset({ source: 'src/neg.svg' })] }), 'viewBox');
+});

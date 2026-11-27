@@ -1,0 +1,13 @@
+{
+  "assets": [
+    {
+      "name": "ood_logo",
+      "source": "src/ood_logo/ood_logo.svg",
+      "formats": ["svg", "png"],
+      "sizes": [16, 24, 32, 64, 128, 256, 512]
+    }
+  ],
+  "dynamic": [
+    { "name": "ood_logo_seasonal", "default": "ood_logo", "schedule": [] }
+  ]
+}
