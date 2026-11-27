@@ -1,14 +1,17 @@
-# Pull request checks. Validates the build but never deploys.
-name: CI
+# Tests pull requests and main. Validates the build but never deploys.
+name: test
 
 on:
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  check:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +21,6 @@ jobs:
           cache: npm
       - run: npm ci
       - uses: extractions/setup-just@v2
-      - run: just lint
       - run: just test
+      - run: just lint
       - run: just build-check
