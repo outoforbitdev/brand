@@ -7,5 +7,7 @@
       "sizes": [16, 24, 32, 64, 128, 256, 512]
     }
   ],
-  "dynamic": []
+  "dynamic": [
+    { "name": "ood_logo_seasonal", "default": "ood_logo", "schedule": [] }
+  ]
 }
