@@ -37,9 +37,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - uses: extractions/setup-just@v2
-      - run: just lint
-      - run: just test
+      - run: npm run lint
+      - run: npm test
       - name: Build (check mode)
         env:
           # Passed via env to avoid script injection from the dispatch input.

@@ -59,7 +59,7 @@ Requires the Node version in `.nvmrc`. Install dependencies with `npm ci`. Comma
 | Command | What it does |
 | --- | --- |
 | `just build` | Builds everything into `dist/` and records new static checksums. |
-| `just build-check` | Same build in `--check` mode. Never writes `static-checksums.json`. This is what CI runs. |
+| `just build-check` | Same build in `--check` mode. Never writes `static-checksums.json`. CI runs the same build. |
 | `just test` | Runs the unit tests (`node --test`). |
 | `just lint` | Runs ESLint. |
 
@@ -133,7 +133,7 @@ Published static files must never change. `static-checksums.json` records the ha
 - A removed static path always fails the build.
 - If a change to a static file is truly intended, run `just build --allow-static-change` locally and commit the rewritten checksums. Consumers who rely on the old bytes will see them change, so avoid this. Prefer adding a new asset.
 
-CI runs `just build-check`, which never writes and fails on any mismatch.
+CI runs `node scripts/build.js --check`, which never writes and fails on any mismatch.
 
 ## Deployment
 
@@ -141,7 +141,7 @@ The `Deploy` workflow builds and deploys to GitHub Pages on a push to `main`, da
 
 The scheduled run deploys whatever is on `main`. If a scheduled run fails, the previous deploy stays live.
 
-Pull requests, pushes to `main` and manual runs use the `test` workflow: tests, lint and `just build-check`.
+Pull requests, pushes to `main` and manual runs use the `test` workflow: `npm test`, `npm run lint` and `node scripts/build.js --check`.
 
 ### Keeping the daily schedule alive
 
